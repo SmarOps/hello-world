@@ -1,1 +1,63 @@
-test
+name: Hello World CI
+
+on:
+	push:
+		branches: [main]
+	pull_request:
+	workflow_dispatch:
+
+permissions:
+	contents: read
+
+concurrency:
+	group: hello-world-${{ github.workflow }}-${{ github.ref }}
+	cancel-in-progress: true
+
+jobs:
+	greet:
+		name: Greet with Node.js ${{ matrix.node-version }}
+		runs-on: ubuntu-latest
+		strategy:
+			fail-fast: false
+			matrix:
+				node-version: [20, 22]
+
+		steps:
+			- name: Check out repository
+				uses: actions/checkout@v4
+
+			- name: Set up Node.js
+				uses: actions/setup-node@v4
+				with:
+					node-version: ${{ matrix.node-version }}
+
+			- name: Say hello
+				run: |
+					echo "Hello from GitHub Actions!"
+					echo "Running on Node.js $(node --version)"
+					echo "Triggered by ${{ github.event_name }}"
+
+			- name: Write job summary
+				run: |
+					{
+						echo "## Hello World CI"
+						echo
+						echo "- **Node.js:** $(node --version)"
+						echo "- **Event:** ${{ github.event_name }}"
+						echo "- **Commit:** \\`${GITHUB_SHA::7}\\`"
+					} >> "$GITHUB_STEP_SUMMARY"
+
+	finish:
+		name: Confirm success
+		if: ${{ always() }}
+		needs: greet
+		runs-on: ubuntu-latest
+		steps:
+			- name: Report result
+				run: |
+					if [[ "${{ needs.greet.result }}" == "success" ]]; then
+						echo "All greetings completed successfully."
+					else
+						echo "The greeting job finished with: ${{ needs.greet.result }}"
+						exit 1
+					fi
